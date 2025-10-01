@@ -31,25 +31,70 @@ ENDFUNCTION ()
 #           список директорій даного шляху змінною <Dirs>
 # ========================
 FUNCTION (check_files files)
-    # Ітеруємоcь по файлах, що були передані функції
     FOREACH (elm ${files})
-        # STRING () - дуже корисна функція
-        # Прапорець FIND просить cmake перевірити,
-        # чи є у стрічці  elm (назва файлу)
-        # підстрічка MOST_WANTED.
         # Якщо так, то створює змінну is_found та
         # передає їй індекс початку підстрічки
         # Якщо ж ні - те саме, тільки передається -1
         STRING (FIND "${elm}" "${MOST_WANTED}" is_found)
-        # Перевіряємо чи ціль знайдено
         IF (is_found GREATER -1)
-            # Повідомляємо про знахіду
             MESSAGE (">>>\t FOUND: ${elm}")
-            # Виходимо з циклу
+            SET (${MY_LIB}_FOUND TRUE PARENT_SCOPE)
             BREAK ()
         ENDIF ()
     ENDFOREACH ()
 ENDFUNCTION ()
+
+# Функція: file_finder()
+# ======================
+# Приймає:  currentDir - (абсолютний) шлях,
+#           saveTo - назва змінної в яку записувати знайдений шлях вразі успіху,
+#           addName - булева змінна, що відповідає за включення цілі пошуку
+#           до її шляху (якщо ми шукаємо бібліотеку, то варто до її шляху
+#           додати її назву:
+#           шлях/до/бібліотеки/<назва_бібліотеки>
+#           якщо ми шукаємо хідер, то нам достатньо самого лиш шляху:
+#           шлях/до/хідера)
+# Виконує:  проходиться по вказаному шляху і перевіряє всі його файли
+#           та файли в його піддиректоріях (на 1 рівень вниз) на відповідність
+#           цілі пошуку <MOST_WANTED>
+# Повертає: якщо пошук успішний:
+#                Знайдений шлях у змінній <Save_to>
+#           якщо ні:
+#                нічого;
+# ======================
+FUNCTION (file_finder currentDir saveTo addName)
+    explore_dir (${currentDir})
+    # Просимо СMake створити змінну LEN і записати туди довжину списку Files
+    LIST (LENGTH Files LEN)
+    IF (NOT LEN EQUAL 0)
+        check_files ("${Files}")
+    ENDIF ()
+
+    IF (${MY_LIB}_FOUND)
+        # Інформуємо глобальну область видимості про вдалий пошук
+        IF (addName)
+            LIST (APPEND ${saveTo} ${currentDir}/${MOST_WANTED})
+        ELSE ()
+            LIST (APPEND ${saveTo} ${currentDir})
+        ENDIF()
+        SET (${MY_LIB}_FOUND TRUE   PARENT_SCOPE)
+        SET (${saveTo} ${${saveTo}} PARENT_SCOPE)
+        # Виходимо з функції
+        RETURN ()
+    ENDIF ()
+    # Якщо не знайшли бажану бібліотеку - продовжуємо пошук
+    FOREACH (dir ${Dirs})
+        # Досліджуємо піддиректорії
+        MESSAGE (">>> EXPLORE: ${dir}")
+        file_finder ("${currentDir}/${dir}" ${saveTo} ${addName})
+        IF (${MY_LIB}_FOUND)
+            SET (${MY_LIB}_FOUND TRUE   PARENT_SCOPE)
+            SET (${saveTo} ${${saveTo}} PARENT_SCOPE)
+            RETURN ()
+        ENDIF ()
+    ENDFOREACH ()
+ENDFUNCTION ()
+
 
 
 # Загальна назва бібліотеки без префікса та розширення
@@ -86,6 +131,11 @@ SET (MY_INCLUDES  inc_e_holmes.h;
 SET (MOST_WANTED ${MY_LIBRARIES})
 
 # Ми знаємо що в цій директорії знаходиться бібліотека
-explore_dir("${CMAKE_SOURCE_DIR}/../search_dir/lib")
+# explore_dir("${CMAKE_SOURCE_DIR}/../search_dir/lib")
 # Передаємо функції файли, знайдені explore_dir()
 check_files ("${Files}")
+
+file_finder ("${CMAKE_SOURCE_DIR}/.." ${MY_LIB}_LIBRARIES TRUE)
+# Перевіряємо чи змінився вміст змінних
+MESSAGE (">>> ${MY_LIB}_FOUND = ${${MY_LIB}_FOUND}")
+MESSAGE (">>> ${MY_LIB}_LIBRARIES = ${${MY_LIB}_LIBRARIES}")
