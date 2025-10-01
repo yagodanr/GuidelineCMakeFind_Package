@@ -85,7 +85,7 @@ FUNCTION (file_finder currentDir saveTo addName)
     # Якщо не знайшли бажану бібліотеку - продовжуємо пошук
     FOREACH (dir ${Dirs})
         # Досліджуємо піддиректорії
-        MESSAGE (">>> EXPLORE: ${dir}")
+        # MESSAGE (">>> EXPLORE: ${dir}")
         file_finder ("${currentDir}/${dir}" ${saveTo} ${addName})
         IF (${MY_LIB}_FOUND)
             SET (${MY_LIB}_FOUND TRUE   PARENT_SCOPE)
@@ -138,4 +138,45 @@ check_files ("${Files}")
 file_finder ("${CMAKE_SOURCE_DIR}/.." ${MY_LIB}_LIBRARIES TRUE)
 # Перевіряємо чи змінився вміст змінних
 MESSAGE (">>> ${MY_LIB}_FOUND = ${${MY_LIB}_FOUND}")
+MESSAGE (">>> ${MY_LIB}_LIBRARIES = ${${MY_LIB}_LIBRARIES}")
+
+SET (${MY_LIB}_LIBRARIES "")
+SET (${MY_LIB}_INCLUDE_DIRS "")
+SET (${MY_LIB}_FOUND FALSE)
+
+IF (NOT DEFINED ${MY_LIB}_ROOT)
+    SET (${MY_LIB}_ROOT "${CMAKE_SOURCE_DIR}/..")
+ENDIF ()
+
+
+
+MACRO (find_most_wanted components saveTo isLib)
+    FOREACH (component IN LISTS ${components})
+        SET(${MY_LIB}_FOUND FALSE)
+        SET (MOST_WANTED ${component})
+        FOREACH (dir IN LISTS ${MY_LIB}_ROOT)
+            file_finder ("${dir}" ${saveTo} ${isLib})
+            IF (NOT ${MY_LIB}_FOUND)
+                CONTINUE ()
+            ENDIF()
+            BREAK ()
+        ENDFOREACH ()
+        IF (NOT ${MY_LIB}_FOUND)
+            MESSAGE(">>>\t NOTFOUND: ${MOST_WANTED}")
+            mark_as_advanced(${MY_LIB}_FOUND)
+            return ()
+        ENDIF()
+    ENDFOREACH ()
+    LIST(REMOVE_DUPLICATES ${saveTo})
+ENDMACRO ()
+
+
+set(${MY_LIB}_FOUND 0)
+# Шукаємо всі необхідні нам компоненти
+find_most_wanted (MY_INCLUDES ${MY_LIB}_INCLUDE_DIRS FALSE)
+find_most_wanted (MY_LIBRARIES ${MY_LIB}_LIBRARIES TRUE)
+
+# Виводимо знайдені шляхи
+MESSAGE (">>> ${MY_LIB}_FOUND = ${${MY_LIB}_FOUND}")
+MESSAGE (">>> ${MY_LIB}_INCLUDE_DIRS = ${${MY_LIB}_INCLUDE_DIRS}")
 MESSAGE (">>> ${MY_LIB}_LIBRARIES = ${${MY_LIB}_LIBRARIES}")
